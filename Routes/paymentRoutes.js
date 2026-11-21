@@ -1,0 +1,10 @@
+import express from 'express';
+import { getPaymentConfig, createCheckoutSession, verifyPayment } from '../Controllers/paymentController.js';
+import { protect } from '../config/jwt.js';
+import { rateLimit } from '../middleware/security.js';
+const router = express.Router();
+router.get('/config', getPaymentConfig);
+router.use(protect, rateLimit({ max: 30 }));
+router.post('/checkout-session', createCheckoutSession);
+router.post('/verify', verifyPayment);
+export default router;

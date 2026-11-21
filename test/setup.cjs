@@ -1,0 +1,10 @@
+process.env.NODE_ENV = 'test';
+process.env.JWT_SECRET = 'jest-only-secret-never-use-in-production';
+process.env.DATABASE = 'mongodb://127.0.0.1:1/jest_no_live_database';
+process.env.STRIPE_SECRET_KEY = '';
+process.env.STRIPE_WEBHOOK_SECRET = '';
+process.env.PAYMENT_RETURN_URL = '';
+process.env.ALLOWED_ORIGINS = 'https://shop.example.test';
+process.env.GMAIL_USER = 'qa@example.test';
+process.env.GMAIL_PASSWORD = 'jest-only-not-a-real-password';
+require('mongoose').set('bufferCommands', false);
