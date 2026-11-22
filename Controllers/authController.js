@@ -1,6 +1,7 @@
 import { createSafeLogger } from '../services/safeLogger.js';
 const console = createSafeLogger('authController');
 import crypto from 'crypto';
+import { OAuth2Client } from 'google-auth-library';
 import User from '../Models/userModel.js';
 import Notification from '../Models/notificationModel.js';
 import { generateToken } from '../config/jwt.js';
@@ -969,70 +970,84 @@ export const deleteUser = async (req, res) => {
 
 // ─────────────────────────────────────────────
 //  POST /api/auth/google
-//  → Verifies Google OAuth access token, finds or creates user, returns JWT
+//  → Verifies Google ID token, finds or creates user, returns JWT
 // ─────────────────────────────────────────────
+const googleAuth = new OAuth2Client();
+
 export const googleLogin = async (req, res) => {
+    const { idToken } = req.body;
+    if (typeof idToken !== 'string' || !idToken.trim()) {
+        return res.status(400).json({ success: false, message: 'Google ID token is required.' });
+    }
+
+    const audience = process.env.GOOGLE_SERVER_CLIENT_ID?.trim();
+    if (!audience) {
+        return res.status(503).json({ success: false, message: 'Google sign-in is unavailable.' });
+    }
+
+    let profile;
     try {
-        const { accessToken } = req.body;
+        const ticket = await googleAuth.verifyIdToken({ idToken, audience });
+        profile = ticket.getPayload();
+    } catch {
+        return res.status(401).json({ success: false, message: 'Invalid Google ID token.' });
+    }
 
-        if (!accessToken) {
-            return res.status(400).json({ success: false, message: 'Google access token is required.' });
-        }
+    if (!profile?.sub || !profile.email || profile.email_verified !== true) {
+        return res.status(400).json({ success: false, message: 'A verified Google email is required.' });
+    }
 
-        // Fetch Google user info using the access token
-        const googleRes = await fetch(
-            `https://www.googleapis.com/oauth2/v3/userinfo`,
-            { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
+    const { sub: googleId, name, picture, hd } = profile;
+    const email = profile.email.toLowerCase().trim();
 
-        if (!googleRes.ok) {
-            return res.status(401).json({ success: false, message: 'Invalid Google access token.' });
-        }
-
-        const googleUser = await googleRes.json();
-        const { email, name, picture, sub: googleId } = googleUser;
-
-        if (!email || googleUser.email_verified !== true) {
-            return res.status(400).json({ success: false, message: 'Could not retrieve email from Google account.' });
-        }
-
-        const normalizedEmail = email.toLowerCase().trim();
-
-        // Find or create user
-        let user = await User.findOne({ email: normalizedEmail });
-
-        if (user) {
-            // If user exists but is blocked, deny access
-            if (user.isActive === false) {
-                return res.status(403).json({ success: false, message: 'Your account has been deactivated. Please contact support.' });
+    try {
+        let user = await User.findOne({ googleId }).select('+googleId');
+        if (!user) {
+            user = await User.findOne({ email }).select('+googleId');
+            if (user) {
+                const googleOwnsEmail = email.endsWith('@gmail.com') || Boolean(hd);
+                if (!user.isVerified || !googleOwnsEmail || user.googleId) {
+                    return res.status(409).json({ success: false, message: 'Sign in with your existing account.' });
+                }
             }
-            // Update Google login flag and profile picture if not set
-            if (!user.isGoogleLogin) user.isGoogleLogin = true;
-            if (!user.image && picture) user.image = picture;
-            if (!user.isVerified) user.isVerified = true;
-            await user.save({ validateBeforeSave: false });
-        } else {
-            // Create new user from Google data — no password needed
+        }
+
+        if (user?.isActive === false) {
+            return res.status(403).json({ success: false, message: 'Your account has been deactivated. Please contact support.' });
+        }
+
+        if (!user) {
             user = await User.create({
-                name: name || 'Google User',
-                email: normalizedEmail,
+                googleId,
+                name: name?.trim().slice(0, 50) || 'Google User',
+                email,
                 image: picture || null,
                 isGoogleLogin: true,
                 isVerified: true,
                 role: 'user',
             });
+        } else if (user.googleId !== googleId) {
+            user = await User.findOneAndUpdate(
+                { _id: user._id, email, isVerified: true, isActive: { $ne: false }, $or: [{ googleId: { $exists: false } }, { googleId }] },
+                { $set: { googleId, isGoogleLogin: true } },
+                { new: true },
+            );
+            if (!user) {
+                return res.status(409).json({ success: false, message: 'Sign in with your existing account.' });
+            }
         }
-
-        const token = generateToken(user._id);
 
         return res.status(200).json({
             success: true,
             message: 'Google login successful!',
-            token,
+            token: generateToken(user._id),
             user: user.toJSON(),
         });
     } catch (error) {
-        console.error('GoogleLogin error:', error);
+        if (error.code === 11000) {
+            return res.status(409).json({ success: false, message: 'Account already exists. Try signing in again.' });
+        }
+        console.error('Google login failed.');
         return res.status(500).json({ success: false, message: 'Server error during Google login.' });
     }
 };

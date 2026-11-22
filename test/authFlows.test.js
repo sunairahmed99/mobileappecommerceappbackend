@@ -2,6 +2,7 @@ import { jest, test, beforeEach, afterEach, expect } from '@jest/globals';
 import request from 'supertest';
 import crypto from 'node:crypto';
 import nodemailer from 'nodemailer';
+import { OAuth2Client } from 'google-auth-library';
 import app from '../app.js';
 import User from '../Models/userModel.js';
 import Notification from '../Models/notificationModel.js';
@@ -94,4 +95,39 @@ test('password hashing and comparison work without a database', async () => {
     expect(await model.comparePassword('long-password')).toBe(true);
     expect(await model.comparePassword('wrong')).toBe(false);
     expect(model.toJSON().password).toBeUndefined();
+});
+
+test('Google sign-in verifies the configured audience and creates a customer linked by subject', async () => {
+    const previousAudience = process.env.GOOGLE_SERVER_CLIENT_ID;
+    process.env.GOOGLE_SERVER_CLIENT_ID = 'android-backend.apps.googleusercontent.com';
+    try {
+        const verify = jest.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockResolvedValue({
+            getPayload: () => ({ sub: 'google-subject', email: 'qa@gmail.com', email_verified: true, name: 'QA' }),
+        });
+        User.findOne.mockImplementation(() => chain(null));
+        const create = jest.spyOn(User, 'create').mockImplementation(async payload => new User({ _id: uid, ...payload }));
+        const response = await request(app).post('/api/auth/google').send({ idToken: 'test-id-token' });
+        expect(response.status).toBe(200);
+        expect(verify).toHaveBeenCalledWith({ idToken: 'test-id-token', audience: process.env.GOOGLE_SERVER_CLIENT_ID });
+        expect(create).toHaveBeenCalledWith(expect.objectContaining({ googleId: 'google-subject', role: 'user' }));
+        expect(response.body.token).toEqual(expect.any(String));
+        expect(response.body.user.googleId).toBeUndefined();
+    } finally {
+        if (previousAudience === undefined) delete process.env.GOOGLE_SERVER_CLIENT_ID;
+        else process.env.GOOGLE_SERVER_CLIENT_ID = previousAudience;
+    }
+});
+
+test('Google sign-in rejects a token that fails audience verification before looking up users', async () => {
+    const previousAudience = process.env.GOOGLE_SERVER_CLIENT_ID;
+    process.env.GOOGLE_SERVER_CLIENT_ID = 'android-backend.apps.googleusercontent.com';
+    try {
+        jest.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockRejectedValue(new Error('Wrong recipient'));
+        const response = await request(app).post('/api/auth/google').send({ idToken: 'wrong-audience' });
+        expect(response.status).toBe(401);
+        expect(User.findOne).not.toHaveBeenCalled();
+    } finally {
+        if (previousAudience === undefined) delete process.env.GOOGLE_SERVER_CLIENT_ID;
+        else process.env.GOOGLE_SERVER_CLIENT_ID = previousAudience;
+    }
 });
