@@ -8,7 +8,7 @@ import { sendOrderConfirmationEmail } from '../config/mailer.js';
 import { nextOrderNumber } from '../services/orderNumber.js';
 import { priceOrder, invalid } from '../services/orderPricing.js';
 import Coupon from '../Models/couponModel.js';
-import { isCardCheckoutConfigured } from './paymentController.js';
+import { isCardPaymentConfigured } from './paymentController.js';
 
 // ── GET /api/orders/my-orders ───────────────────────────────────────
 export const getMyOrders = async (req, res) => {
@@ -62,7 +62,7 @@ export const createOrder = async (req, res) => {
         const { items, subtotal, discount, couponCode, shippingFee, tax, totalAmount } = await priceOrder(req.body, userId);
         const card = paymentMethod === 'Credit / Debit Card (Stripe)';
         if (!['Cash on Delivery (COD)', 'Credit / Debit Card (Stripe)'].includes(paymentMethod)) throw invalid('Invalid payment method.');
-        if (card && !isCardCheckoutConfigured()) throw invalid('Card payments are currently unavailable. Please choose cash on delivery.', 503);
+        if (card && !isCardPaymentConfigured()) throw invalid('Card payments are currently unavailable. Please choose cash on delivery.', 503);
 
         if (!items || items.length === 0) {
             return res.status(400).json({ success: false, message: 'Order items cannot be empty.' });

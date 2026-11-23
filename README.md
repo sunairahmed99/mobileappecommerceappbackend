@@ -22,11 +22,15 @@ In Vercel Settings > Environment Variables, add values for Production and Previe
 | `ALLOWED_ORIGINS` | Exact browser frontend origins separated by commas; no trailing slash |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Media uploads; existing lowercase aliases are also supported |
 | `GMAIL_USER`, `GMAIL_PASSWORD` | Account email and Gmail app password for OTP mail |
-| `STRIPE_SECRET_KEY`, `STRIPE_CURRENCY` | Stripe payments; use `usd` or your configured currency |
+| `STRIPE_SECRET_KEY` | Stripe server key. Use a newly rotated test key for sandbox payments. Restricted keys need access to create and read PaymentIntents, and Checkout Sessions if using web checkout. |
+| `STRIPE_PUBLISHABLE_KEY` | Publishable key from the same Stripe account and mode as the server key. The API returns it to the mobile app when starting a payment. |
+| `STRIPE_CURRENCY` | Three-letter Stripe currency matching the store's order totals, for example `usd` for US dollars. |
 | `STRIPE_WEBHOOK_SECRET` | Signing secret from the deployed webhook endpoint |
 | `PAYMENT_RETURN_URL` | Public frontend profile URL, e.g. `https://your-frontend.example/profile` |
 
-`PORT` is only used locally. Vercel sets `VERCEL` and `NODE_ENV` automatically. Atlas must permit network access from the deployment and the database user must have the required permissions. Configure Stripe to send `checkout.session.completed` and `checkout.session.async_payment_succeeded` to `https://YOUR-BACKEND.vercel.app/api/payment/webhook`.
+`PORT` is only used locally. Vercel sets `VERCEL` and `NODE_ENV` automatically. Atlas must permit network access from the deployment and the database user must have the required permissions.
+
+In the Stripe sandbox, set up a webhook at `https://YOUR-BACKEND.vercel.app/api/payment/webhook` for `payment_intent.succeeded`. For hosted web checkout, also select `checkout.session.completed` and `checkout.session.async_payment_succeeded` and set `PAYMENT_RETURN_URL`. Set the webhook's signing secret in `STRIPE_WEBHOOK_SECRET`, add the Stripe environment variables in the backend deployment, and redeploy.
 
 After adding/changing environment variables, redeploy. Check:
 

@@ -5,7 +5,7 @@ const privateFields = new Set([
     'resetpasswordotp', 'resetpasswordexpire', 'resetpasswordresendcount',
     'resetpasswordresendwindowstart', 'resetpasswordlastsentat', 'resetpasswordresendlockeduntil',
     'emailchangeotp', 'emailchangeotpexpire', 'pendingemail', 'pushtoken',
-    'stripecheckoutsessionid', 'stripepaymentintentid', 'stripechargeid',
+    'stripecheckoutsessionid', 'stripepaymentintentid', 'stripechargeid', 'stripepaymentflow',
     'publicid', 'publicids', 'imagepublicid', 'imagepublicids', 'logopublicid',
     'apikey', 'apisecret', 'clientsecret', 'jwtsecret', 'authorization', 'stack', '__v',
 ]);

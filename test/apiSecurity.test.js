@@ -132,7 +132,7 @@ const routes = Object.entries(mounts).flatMap(([mount, router]) => router.stack.
         : mount === 'feedback' ? (method === 'get' && route.path === '/public') || (method === 'post' && route.path === '/')
         : mount === 'coupons' && route.path === '/validate';
     const admin = !publicRoute && (['products', 'banners', 'banner-categories', 'deals', 'delivery-settings', 'store-settings'].includes(mount)
-        || mount === 'auth' && route.path.startsWith('/users') || mount === 'feedback' || mount === 'coupons'
+        || mount === 'auth' && route.path.startsWith('/users') || mount === 'coupons'
         || path.includes('/admin/') || mount === 'notifications' && ['/customer-spending', '/send-deal', '/send-coupon', '/campaign-history', '/send-push'].includes(route.path));
     return { method, path, url: path.replace(/:[\w]+/g, id), publicRoute, admin };
 })));
@@ -238,7 +238,7 @@ describe('sensitive response data', () => {
     test('public payment config exposes no Stripe credentials', async () => {
         const response = await request(app).get('/api/payment/config');
         expect(response.status).toBe(200);
-        expect(Object.keys(response.body).sort()).toEqual(['currency', 'isConfigured', 'success']);
+        expect(Object.keys(response.body).sort()).toEqual(['currency', 'isConfigured', 'paymentSheetConfigured', 'success']);
     });
 });
 

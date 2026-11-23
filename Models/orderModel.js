@@ -55,6 +55,7 @@ const orderSchema = new mongoose.Schema(
             default: null
         },
         stripeCheckoutSessionId: { type: String, default: null, select: false },
+        stripePaymentFlow: { type: String, enum: ['hosted', 'sheet'], select: false },
         status: {
             type: String,
             enum: ORDER_STATUSES,
@@ -70,6 +71,7 @@ const orderSchema = new mongoose.Schema(
                 delete ret._id;
                 delete ret.__v;
                 delete ret.stripeCheckoutSessionId;
+                delete ret.stripePaymentFlow;
                 delete ret.stripePaymentIntentId;
                 delete ret.stripeChargeId;
                 return ret;
