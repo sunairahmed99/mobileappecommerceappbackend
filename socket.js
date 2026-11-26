@@ -82,7 +82,7 @@ export const initSocket = (httpServer, { beforeAuthenticate } = {}) => {
                     role: item.sender === 'assistant' ? 'model' : 'user',
                     text: item.text.slice(0, 500),
                 }));
-                answer = await generateCatalogReply({ message: message.text.slice(0, 500), history, signal: pending.signal });
+                answer = await generateCatalogReply({ message: message.text.slice(0, 500), history, signal: pending.signal, openProduct: true });
             }
             if (!canReply()) return;
             const reply = await Message.create({
@@ -95,6 +95,9 @@ export const initSocket = (httpServer, { beforeAuthenticate } = {}) => {
             }
             room.emit('new_message', reply);
             io.to('admin_room').emit('new_message', reply);
+            if (answer.productToOpen && socket.connected) {
+                socket.emit('assistant_open_product', { productId: answer.productToOpen });
+            }
         } catch {
             if (canReply()) room.emit('assistant_status', { error: 'The AI assistant is temporarily unavailable.' });
         } finally {

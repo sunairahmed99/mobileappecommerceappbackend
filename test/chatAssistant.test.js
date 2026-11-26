@@ -156,6 +156,23 @@ describe('public AI store assistant', () => {
             await guest.packet('42["new_message"');
             expect(await guest.packet('42["new_message"')).toContain('Welcome back!');
             expect(saved.map(message => message.sender)).toEqual(['user', 'user', 'admin', 'user', 'assistant']);
+
+            const blueId = '507f1f77bcf86cd799439012';
+            const bestsellerId = '507f1f77bcf86cd799439013';
+            const blueShirt = { _id: blueId, name: 'Blue & Black Check Shirt', price: 1200, isInStock: true };
+            const bestseller = { _id: bestsellerId, name: 'Cotton Shirt', price: 1400, isInStock: true };
+            Product.find.mockReturnValue(query([bestseller, blueShirt]));
+            jest.spyOn(Order, 'aggregate').mockResolvedValue([bestseller, blueShirt]);
+            for (const [text, productId] of [
+                ['Blue shirt ka 1', blueId],
+                ['Best sale', bestsellerId],
+            ]) {
+                guest.emit('send_message', { text });
+                expect(await guest.packet('42["assistant_open_product"')).toBe(
+                    '42' + JSON.stringify(['assistant_open_product', { productId }])
+                );
+            }
+            expect(upstream).toHaveBeenCalledTimes(2);
         } finally {
             for (const client of clients) client.close();
             await io.close();

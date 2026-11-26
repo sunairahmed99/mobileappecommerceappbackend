@@ -10,7 +10,9 @@ const PRODUCT_FIELDS = 'name description category price originalPrice discount s
 const STORE_FIELDS = 'storeName tagline supportEmail supportPhone address currency noticeBarText isStoreOpen';
 const DELIVERY_FIELDS = 'minOrderForDelivery deliveryCharge freeDeliveryThreshold isActive';
 const STOP_WORDS = new Set(['the', 'and', 'for', 'with', 'this', 'that', 'what', 'where', 'when', 'from', 'have', 'your', 'you', 'can', 'are', 'how', 'show', 'find', 'related', 'similar', 'products', 'product', 'items', 'please', 'mera', 'meri', 'mujhe', 'kya', 'hai', 'hain', 'ka', 'ki', 'ke', 'batao', 'dikhao', 'nikaldo']);
-const BEST_SELLERS = /\b(?:best[ -]?sell(?:ing|ers?)?|top[ -]?sell(?:ing|ers?)?|most[ -]?(?:sold|purchased|popular)|popular products?)\b/i;
+const BEST_SELLERS = /\b(?:best[ -]?(?:sell(?:ing|ers?)?|sales?)|top[ -]?sell(?:ing|ers?)?|most[ -]?(?:sold|purchased|popular)|popular products?)\b/i;
+const SHOPPING_WORDS = new Set(['me', 'to', 'one', 'want', 'need', 'like', 'open', 'take', 'get', 'buy', 'give', 'chahiye', 'chahye', 'chahiay', 'do', 'dedo', 'mughe', 'muje', 'lejao', 'wala', 'wali', 'mujhay', 'ek', 'aik']);
+const PRODUCT_QUESTION = /\b(?:price|cost|sizes?|colou?rs?|stock|available|availability|similar|related|alternatives?|compare|difference|how much|kitn[aei]|payment|delivery|shipping|returns?|exchange|refund|support)\b/i;
 
 function shorten(value, maxLength) {
     return typeof value === 'string' ? value.slice(0, maxLength) : value;
@@ -31,14 +33,14 @@ async function getPublicContext(message, history) {
     const words = [...new Set([...currentWords, ...(useHistory ? followUps.flatMap(item => searchWords(item.text)) : [])])].slice(0, 8);
     const productFilter = {
         isActive: true,
-        $or: words.flatMap(word => ['name', 'description', 'category'].map(field => ({
+        $or: words.flatMap(word => ['name', 'description', 'category', 'colors'].map(field => ({
             [field]: literalSearch(word),
         }))),
     };
 
     const now = new Date();
-    const wantsDeals = /\b(deals?|offers?|sales?|promotions?|discounts?)\b/i.test(message);
     const bestSellers = BEST_SELLERS.test(message);
+    const wantsDeals = !bestSellers && /\b(deals?|offers?|sales?|promotions?|discounts?)\b/i.test(message);
     const [matches, store, delivery, deals] = await Promise.all([
         bestSellers ? Order.aggregate([
             { $match: { status: 'Delivered', paymentStatus: { $nin: ['Refunded', 'Failed'] } } },
@@ -63,11 +65,23 @@ async function getPublicContext(message, history) {
         const weight = currentWords.includes(word) ? 2 : 1;
         return score + weight * (
             (product.name?.toLowerCase().includes(word) ? 8 : 0) +
+            (product.colors?.some(color => searchWords(color).includes(word)) ? 5 : 0) +
             (product.category?.toLowerCase().includes(word) ? 4 : 0) +
             (product.description?.toLowerCase().includes(word) ? 1 : 0)
         );
     }, 0);
     const products = (bestSellers ? matches : matches.sort((a, b) => rank(b) - rank(a))).slice(0, 6);
+    const requestedWords = currentWords.filter(word => !SHOPPING_WORDS.has(word) && !/^\d+$/.test(word));
+    const canOpenProduct = !PRODUCT_QUESTION.test(message);
+    const firstMatch = canOpenProduct && (bestSellers ? products[0] : requestedWords.length && matches.find(product => {
+        if (!product.isInStock) return false;
+        const listingWords = searchWords([product.name, product.category, ...(product.colors || [])].join(' '));
+        return requestedWords.every(word => listingWords.includes(word));
+    }));
+    if (firstMatch && !products.includes(firstMatch)) {
+        products.unshift(firstMatch);
+        products.pop();
+    }
     if (!bestSellers && products.length && /\b(?:similar|related|alternatives?|like this)\b/i.test(message)) {
         const match = products[0];
         const related = await Product.find({
@@ -110,6 +124,7 @@ async function getPublicContext(message, history) {
     };
     return {
         context,
+        productToOpen: firstMatch?._id ? String(firstMatch._id) : undefined,
         cards: products.filter(product => product._id).map(product => ({
             id: String(product._id),
             name: product.name,
@@ -120,7 +135,7 @@ async function getPublicContext(message, history) {
     };
 }
 
-export async function generateCatalogReply({ message, history = [], signal }) {
+export async function generateCatalogReply({ message, history = [], signal, openProduct = false }) {
     const apiKey = process.env.GEMINI_API_KEY?.trim();
     if (!apiKey) {
         const error = new Error('Gemini is not configured.');
@@ -129,7 +144,11 @@ export async function generateCatalogReply({ message, history = [], signal }) {
     }
 
     const model = getModelName();
-    const { context, cards } = await getPublicContext(message, history);
+    const { context, cards, productToOpen } = await getPublicContext(message, history);
+    if (openProduct && productToOpen) {
+        const product = cards.find(card => card.id === productToOpen);
+        return { reply: `I found ${product.name} for you.`, products: cards, productToOpen };
+    }
     const systemInstruction = [
         'You are the customer support assistant for this online store.',
         'Always reply in clear, natural English, even when the customer writes in another language.',
