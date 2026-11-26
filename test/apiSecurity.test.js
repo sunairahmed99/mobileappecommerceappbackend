@@ -130,7 +130,7 @@ const routes = Object.entries(mounts).flatMap(([mount, router]) => router.stack.
         : ['products', 'banners', 'banner-categories', 'deals', 'delivery-settings', 'store-settings'].includes(mount) ? method === 'get'
         : mount === 'payment' ? route.path === '/config'
         : mount === 'feedback' ? (method === 'get' && route.path === '/public') || (method === 'post' && route.path === '/')
-        : mount === 'coupons' && route.path === '/validate';
+        : (mount === 'coupons' && route.path === '/validate') || (mount === 'chat' && method === 'post' && route.path === '/assistant');
     const admin = !publicRoute && (['products', 'banners', 'banner-categories', 'deals', 'delivery-settings', 'store-settings'].includes(mount)
         || mount === 'auth' && route.path.startsWith('/users') || mount === 'coupons'
         || path.includes('/admin/') || mount === 'notifications' && ['/customer-spending', '/send-deal', '/send-coupon', '/campaign-history', '/send-push'].includes(route.path));

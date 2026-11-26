@@ -80,5 +80,7 @@ const orderSchema = new mongoose.Schema(
     }
 );
 
+orderSchema.index({ user: 1, createdAt: -1 });
+
 export default mongoose.model('Order', orderSchema);
 

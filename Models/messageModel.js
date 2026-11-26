@@ -9,12 +9,24 @@ const messageSchema = new mongoose.Schema(
         },
         sender: {
             type: String,
-            enum: ['user', 'admin'],
+            enum: ['user', 'admin', 'assistant'],
             required: true,
         },
         senderName: {
             type: String,
             default: 'User',
+        },
+        isGuest: { type: Boolean, default: false },
+        orderLookup: { type: Boolean, select: false },
+        products: {
+            type: [new mongoose.Schema({
+                id: String,
+                name: String,
+                price: Number,
+                currency: String,
+                inStock: Boolean,
+            }, { _id: false })],
+            default: undefined,
         },
         text: {
             type: String,
@@ -60,5 +72,7 @@ const messageSchema = new mongoose.Schema(
         },
     }
 );
+
+messageSchema.index({ user: 1, createdAt: -1 });
 
 export default mongoose.model('Message', messageSchema);

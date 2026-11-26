@@ -27,6 +27,14 @@ In Vercel Settings > Environment Variables, add values for Production and Previe
 | `STRIPE_CURRENCY` | Three-letter Stripe currency matching the store's order totals, for example `usd` for US dollars. |
 | `STRIPE_WEBHOOK_SECRET` | Signing secret from the deployed webhook endpoint |
 | `PAYMENT_RETURN_URL` | Public frontend profile URL, e.g. `https://your-frontend.example/profile` |
+| `GEMINI_API_KEY` | Server-only Google Gemini API key for the public store assistant. Never put this in frontend `EXPO_PUBLIC_*` variables. |
+| `GEMINI_MODEL` | Optional Gemini model name. Defaults to `gemini-3.5-flash-lite`. |
+
+Guest and signed-in support chats save text messages and AI replies in MongoDB for the admin inbox. Guest history follows a randomly generated credential stored on the device or browser. Admins can reply to guests by text. A foreground admin dashboard handles incoming messages while available. Gemini handles the next incoming message when all admins go offline. If an admin becomes available during generation, the pending reply is cancelled.
+
+The assistant replies in English and retrieves active public products, current deals, and public store and delivery settings at request time. Product matches include tappable Shop cards. Best sellers are ranked by units in delivered orders, excluding refunded and failed payments, and show active, in-stock listings.
+
+Order status and details are read directly from the signed-in customer's own orders. Guests receive a sign-in prompt for order lookups. The backend handles those replies and excludes order lookups from Gemini conversation context. Add the Gemini key to the backend host's environment variables and redeploy.
 
 `PORT` is only used locally. Vercel sets `VERCEL` and `NODE_ENV` automatically. Atlas must permit network access from the deployment and the database user must have the required permissions.
 
@@ -43,7 +51,7 @@ Set the mobile frontend's `EXPO_PUBLIC_API_URL=https://YOUR-BACKEND.vercel.app` 
 
 ## Hosting limits
 
-Vercel supports WebSocket connections with Fluid compute, but connections can close at the function duration limit. Client reconnection is required. Current Socket.IO rooms and presence are in memory: chat between clients on different function instances requires a shared adapter/presence store before reliable scaled realtime operation. HTTP chat history remains database-backed.
+Vercel supports WebSocket connections with Fluid compute. Connections can close at the function duration limit, and the app reconnects and reloads customer chat history. Use a single persistent Socket.IO backend instance for reliable live handoff. Scaling to multiple instances requires shared rooms, presence, and assistant cancellation. Chat history remains database-backed.
 
 Vercel Functions impose a 4.5 MB request/response body limit. Existing upload routes accept larger files locally, so files above the platform limit need direct signed Cloudinary uploads before they can work on Vercel. In-memory application rate limits are per instance; use Vercel Firewall rules or a shared store for global limits.
 

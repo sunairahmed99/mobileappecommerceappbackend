@@ -3,13 +3,16 @@ const console = createSafeLogger('chatRoutes');
 import express from 'express';
 import Message from '../Models/messageModel.js';
 import User from '../Models/userModel.js';
-import { protect, adminOnly } from '../config/jwt.js';
+import { protect, adminOnly, optionalProtect } from '../config/jwt.js';
 import multer from 'multer';
 import { MAX_CHAT_FILE_SIZE } from '../services/chatAttachments.js';
 import { sendChatAttachment, getChatAttachment } from '../Controllers/chatAttachmentController.js';
+import { chatAssistant } from '../Controllers/chatAssistantController.js';
+import { rateLimit } from '../middleware/security.js';
 
 const router = express.Router();
 const chatUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_CHAT_FILE_SIZE, files: 1, fields: 4, parts: 5 } });
+router.post('/assistant', rateLimit({ windowMs: 60 * 1000, max: 12, message: 'Too many assistant requests. Please wait a minute and try again.' }), optionalProtect, chatAssistant);
 router.post('/:userId/attachments', protect, adminOnly, chatUpload.single('file'), sendChatAttachment);
 router.get('/attachments/:messageId', protect, getChatAttachment);
 
@@ -41,7 +44,7 @@ router.get('/admin/conversations', protect, adminOnly, async (req, res) => {
                     lastMessage: { $first: '$text' },
                     lastSender: { $first: '$sender' },
                     lastCreatedAt: { $first: '$createdAt' },
-                    senderName: { $first: '$senderName' },
+                    isGuest: { $max: '$isGuest' },
                     unreadCount: {
                         $sum: {
                             $cond: [{ $and: [{ $eq: ['$sender', 'user'] }, { $eq: ['$readByAdmin', false] }] }, 1, 0],
@@ -57,7 +60,8 @@ router.get('/admin/conversations', protect, adminOnly, async (req, res) => {
                 const userDoc = await User.findById(c._id).select('name email image phone');
                 return {
                     userId: c._id,
-                    userName: userDoc?.name || c.senderName || 'Customer',
+                    userName: userDoc?.name || (c.isGuest ? 'Guest' : 'Customer'),
+                    isGuest: !userDoc && Boolean(c.isGuest),
                     userEmail: userDoc?.email || '',
                     userImage: userDoc?.image || '',
                     lastMessage: c.lastMessage,
