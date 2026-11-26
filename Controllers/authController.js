@@ -974,13 +974,19 @@ export const deleteUser = async (req, res) => {
 // ─────────────────────────────────────────────
 const googleAuth = new OAuth2Client();
 
+const getGoogleClientId = () => process.env.GOOGLE_SERVER_CLIENT_ID?.trim();
+
+export const googleSignInConfig = (_req, res) => {
+    res.json({ success: true, clientId: getGoogleClientId() || null });
+};
+
 export const googleLogin = async (req, res) => {
     const { idToken } = req.body;
     if (typeof idToken !== 'string' || !idToken.trim()) {
         return res.status(400).json({ success: false, message: 'Google ID token is required.' });
     }
 
-    const audience = process.env.GOOGLE_SERVER_CLIENT_ID?.trim();
+    const audience = getGoogleClientId();
     if (!audience) {
         return res.status(503).json({ success: false, message: 'Google sign-in is unavailable.' });
     }

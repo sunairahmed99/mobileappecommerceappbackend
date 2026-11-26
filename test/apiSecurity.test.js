@@ -123,7 +123,7 @@ describe('review moderation', () => {
 });
 
 const mounts = { auth: authRoutes, products: productRoutes, banners: bannerRoutes, 'banner-categories': categoryRoutes, deals: dealRoutes, orders: orderRoutes, feedback: feedbackRoutes, notifications: notificationRoutes, chat: chatRoutes, coupons: couponRoutes, 'delivery-settings': deliveryRoutes, 'store-settings': settingsRoutes, payment: paymentRoutes };
-const publicAuth = new Set(['/register', '/login', '/google', '/verify-registration-otp', '/resend-verification-otp', '/forgot-password', '/resend-forgot-password-otp', '/reset-password']);
+const publicAuth = new Set(['/register', '/login', '/google', '/google/config', '/verify-registration-otp', '/resend-verification-otp', '/forgot-password', '/resend-forgot-password-otp', '/reset-password']);
 const routes = Object.entries(mounts).flatMap(([mount, router]) => router.stack.filter(layer => layer.route).flatMap(({ route }) => Object.keys(route.methods).map(method => {
     const path = `/api/${mount}${route.path === '/' ? '' : route.path}`;
     const publicRoute = mount === 'auth' ? publicAuth.has(route.path)

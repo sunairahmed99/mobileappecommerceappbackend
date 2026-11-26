@@ -6,6 +6,7 @@ import {
     resendVerificationOtp,
     login,
     googleLogin,
+    googleSignInConfig,
     getMe,
     forgotPassword,
     resendForgotPasswordOtp,
@@ -65,7 +66,8 @@ router.post('/register', authLimiter, upload.single('image'), register);
 router.post('/verify-registration-otp', otpLimiter, verifyRegistrationOtp); // body: { email, otp }
 router.post('/resend-verification-otp', otpLimiter, resendVerificationOtp); // body: { email }
 router.post('/login', authLimiter, login);
-router.post('/google', authLimiter, googleLogin);                           // body: { accessToken }
+router.get('/google/config', googleSignInConfig);
+router.post('/google', authLimiter, googleLogin);
 router.post('/forgot-password', authLimiter, forgotPassword);
 router.post('/resend-forgot-password-otp', authLimiter, resendForgotPasswordOtp);
 router.post('/reset-password', authLimiter, resetPassword);   // body: { email, otp, password }

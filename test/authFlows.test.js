@@ -101,6 +101,9 @@ test('Google sign-in verifies the configured audience and creates a customer lin
     const previousAudience = process.env.GOOGLE_SERVER_CLIENT_ID;
     process.env.GOOGLE_SERVER_CLIENT_ID = 'android-backend.apps.googleusercontent.com';
     try {
+        const config = await request(app).get('/api/auth/google/config');
+        expect(config.status).toBe(200);
+        expect(config.body).toEqual({ success: true, clientId: process.env.GOOGLE_SERVER_CLIENT_ID });
         const verify = jest.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockResolvedValue({
             getPayload: () => ({ sub: 'google-subject', email: 'qa@gmail.com', email_verified: true, name: 'QA' }),
         });
