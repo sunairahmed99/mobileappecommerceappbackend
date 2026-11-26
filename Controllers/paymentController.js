@@ -23,6 +23,7 @@ const handleError = (res, error) => res.status(error.status || 500).json({
 
 export const getPaymentConfig = (_req, res) => res.json({
     success: true, isConfigured: isCardCheckoutConfigured(), paymentSheetConfigured: isPaymentSheetConfigured(), currency: currency(),
+    publishableKey: isPaymentSheetConfigured() ? process.env.STRIPE_PUBLISHABLE_KEY : null,
 });
 
 async function ownedOrder(req) {

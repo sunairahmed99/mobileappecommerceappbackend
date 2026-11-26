@@ -235,10 +235,22 @@ describe('sensitive response data', () => {
         expect(response.body.feedbacks[0]).toEqual({ id, name: 'Reviewer', subject: 'Review', message: 'Good product', rating: 4 });
         expect(response.text).not.toContain(secret);
     });
-    test('public payment config exposes no Stripe credentials', async () => {
-        const response = await request(app).get('/api/payment/config');
-        expect(response.status).toBe(200);
-        expect(Object.keys(response.body).sort()).toEqual(['currency', 'isConfigured', 'paymentSheetConfigured', 'success']);
+    test('public payment config exposes only the matching Stripe publishable key', async () => {
+        const env = jest.replaceProperty(process, 'env', {
+            ...process.env, STRIPE_SECRET_KEY: 'sk_test_mock', STRIPE_PUBLISHABLE_KEY: 'pk_test_mock',
+        });
+        try {
+            const response = await request(app).get('/api/payment/config');
+            expect(response.status).toBe(200);
+            expect(Object.keys(response.body).sort()).toEqual(['currency', 'isConfigured', 'paymentSheetConfigured', 'publishableKey', 'success']);
+            expect(response.body.publishableKey).toBe('pk_test_mock');
+            expect(response.text).not.toContain('sk_test_mock');
+            process.env.STRIPE_PUBLISHABLE_KEY = 'pk_live_mock';
+            const mismatched = await request(app).get('/api/payment/config');
+            expect(mismatched.body).toMatchObject({ paymentSheetConfigured: false, publishableKey: null });
+        } finally {
+            env.restore();
+        }
     });
 });
 
